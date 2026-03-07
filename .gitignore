@@ -9,3 +9,8 @@ venv/
 
 # HuggingFace cache (VERY IMPORTANT)
 .cache/
+
+# Project data
+dataset/
+model/
+results/

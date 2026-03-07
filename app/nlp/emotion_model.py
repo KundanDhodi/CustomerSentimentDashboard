@@ -1,31 +1,35 @@
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
+from transformers import pipeline
 
-MODEL_NAME = "bhadresh-savani/distilbert-base-uncased-emotion"
+emotion_classifier = pipeline(
+    "text-classification",
+    model="./model",
+    tokenizer="./model",
+    top_k=None
+)
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
-
-model.eval()
-
-labels = model.config.id2label
-
+label_map = {
+    "LABEL_0": "anger",
+    "LABEL_1": "fear",
+    "LABEL_2": "joy",
+    "LABEL_3": "love",
+    "LABEL_4": "sadness",
+    "LABEL_5": "surprise"
+}
 
 def analyze_text(text: str):
-    inputs = tokenizer(
-        text,
-        return_tensors="pt",
-        truncation=True,
-        padding=True
-    )
 
-    with torch.no_grad():
-        outputs = model(**inputs)
-        scores = torch.softmax(outputs.logits, dim=1)
+    result = emotion_classifier(text)[0]
 
-    confidence, predicted_class = torch.max(scores, dim=1)
+    emotions = {}
+
+    for r in result:
+        emotions[label_map[r["label"]]] = r["score"]
+
+    dominant_emotion = max(emotions, key=emotions.get)
+    confidence = emotions[dominant_emotion]
 
     return {
-        "emotion": labels[predicted_class.item()],
-        "confidence": round(confidence.item(), 3)
+        "emotion": dominant_emotion,
+        "confidence": round(confidence, 3),
+        "scores": emotions
     }

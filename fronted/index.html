@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Customer Sentiment Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+margin:40px;
+background:#f4f6f8;
+}
+
+textarea{
+width:500px;
+height:150px;
+padding:10px;
+}
+
+button{
+padding:10px 20px;
+margin-top:10px;
+cursor:pointer;
+}
+
+#chart-container{
+width:400px;
+margin-top:30px;
+}
+
+#bar-container{
+width:500px;
+margin-top:40px;
+}
+
+#sentiment-container{
+width:500px;
+margin-top:40px;
+}
+
+table{
+margin-top:30px;
+border-collapse:collapse;
+width:800px;
+background:white;
+}
+
+th,td{
+border:1px solid #ccc;
+padding:10px;
+text-align:left;
+}
+
+th{
+background:#eee;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>Customer Sentiment Dashboard</h1>
+
+<textarea id="emails" placeholder="Paste emails (one per line)"></textarea>
+
+<br>
+
+<button onclick="analyzeEmails()">Analyze Emails</button>
+
+<h3 id="summary"></h3>
+
+<div id="chart-container">
+<canvas id="emotionChart"></canvas>
+</div>
+
+<div id="bar-container">
+<canvas id="scoreChart"></canvas>
+</div>
+
+<div id="sentiment-container">
+<canvas id="sentimentChart"></canvas>
+</div>
+
+<h2>Email Analysis</h2>
+
+<table id="resultsTable">
+
+<thead>
+
+<tr>
+<th>Email</th>
+<th>Emotion</th>
+<th>Confidence</th>
+</tr>
+
+</thead>
+
+<tbody></tbody>
+
+</table>
+
+<script>
+
+let pieChart
+let barChart
+let sentimentChart
+
+async function analyzeEmails(){
+
+const text=document.getElementById("emails").value
+
+const emails=text.split("\n").filter(e=>e.trim()!="")
+
+const response=await fetch("http://localhost:8000/analyze-emails",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+emails:emails
+})
+
+})
+
+const data=await response.json()
+
+showSummary(data)
+
+createPieChart(data.emotion_distribution)
+
+fillTable(emails,data.individual_results)
+
+createScoreBars(data.individual_results)
+
+createSentimentAnalytics(data.individual_results)
+
+}
+
+
+function showSummary(data){
+
+document.getElementById("summary").innerHTML=
+
+"<b>Total Emails:</b> "+data.total_emails+
+"<br><b>Dominant Emotion:</b> "+data.dominant_emotion
+
+}
+
+
+function createPieChart(distribution){
+
+const labels=Object.keys(distribution)
+
+const values=Object.values(distribution)
+
+const ctx=document.getElementById("emotionChart")
+
+if(pieChart){
+pieChart.destroy()
+}
+
+pieChart=new Chart(ctx,{
+
+type:"pie",
+
+data:{
+labels:labels,
+datasets:[{
+data:values
+}]
+}
+
+})
+
+}
+
+
+function createScoreBars(results){
+
+const scores=results[0].scores
+
+const labels=Object.keys(scores)
+
+const values=Object.values(scores)
+
+const ctx=document.getElementById("scoreChart")
+
+if(barChart){
+barChart.destroy()
+}
+
+barChart=new Chart(ctx,{
+
+type:"bar",
+
+data:{
+labels:labels,
+datasets:[{
+label:"Emotion Scores (First Email)",
+data:values
+}]
+}
+
+})
+
+}
+
+
+function createSentimentAnalytics(results){
+
+let positive=0
+let negative=0
+let neutral=0
+
+results.forEach(r=>{
+
+if(["joy","love","surprise"].includes(r.emotion)){
+positive++
+}
+else if(["anger","fear","sadness"].includes(r.emotion)){
+negative++
+}
+else{
+neutral++
+}
+
+})
+
+const total=results.length
+
+const csat=Math.round((positive/total)*100)
+
+document.getElementById("summary").innerHTML+=
+"<br><b>CSAT Score:</b> "+csat+"%"
+
+createSentimentChart(positive,negative,neutral)
+
+}
+
+
+function createSentimentChart(p,n,u){
+
+const ctx=document.getElementById("sentimentChart")
+
+if(sentimentChart){
+sentimentChart.destroy()
+}
+
+sentimentChart=new Chart(ctx,{
+
+type:"bar",
+
+data:{
+
+labels:["Positive","Negative","Neutral"],
+
+datasets:[{
+
+label:"Sentiment Distribution",
+
+data:[p,n,u]
+
+}]
+
+}
+
+})
+
+}
+
+
+function fillTable(emails,results){
+
+const table=document.querySelector("#resultsTable tbody")
+
+table.innerHTML=""
+
+for(let i=0;i<emails.length;i++){
+
+const confidence=results[i].confidence
+
+const intensity=Math.floor(confidence*255)
+
+const color=`rgb(255,${255-intensity},${255-intensity})`
+
+const row=`
+
+<tr style="background:${color}">
+
+<td>${emails[i]}</td>
+
+<td>${results[i].emotion}</td>
+
+<td>${confidence}</td>
+
+</tr>
+
+`
+
+table.innerHTML+=row
+
+}
+
+}
+
+</script>
+
+</body>
+
+</html>
